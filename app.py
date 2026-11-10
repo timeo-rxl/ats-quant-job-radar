@@ -1,5 +1,5 @@
 # app.py
-"""ATS Quant Job Radar v2.0 — Application Streamlit principale."""
+"""ATS Quant Job Radar v2.1 — Application Streamlit bilingue (FR / EN)."""
 
 from __future__ import annotations
 from datetime import date
@@ -10,13 +10,16 @@ import html
 import streamlit as st
 
 import radar.data as radar_data
+from radar.i18n import (
+    t,
+    format_year_label,
+    status_to_display,
+)
 from radar.onboarding import (
-    QUESTIONS,
     AVAILABLE_INTERESTS,
-    INTEREST_LABELS_FR,
+    get_questions,
     process_onboarding_step,
     build_profile_from_answers,
-    format_profile_summary,
 )
 from radar.scoring import (
     explain_score,
@@ -32,13 +35,10 @@ from radar.tracker import (
 )
 
 
-# ---------------------------------------------------------------------------
-# Chargement résilient des données (compatible avec toutes les variantes de radar/data.py)
-# ---------------------------------------------------------------------------
 def _load_dataset() -> tuple[Any, List[Any]]:
     base = Path(__file__).resolve().parent
     profile_path = base / "my_profile.yaml"
-    programs_path = base / "data" / "programs.yaml"
+    programs_path = base / "data/programs.yaml"
 
     if hasattr(radar_data, "load_profile"):
         default_profile = radar_data.load_profile(profile_path)
@@ -57,9 +57,6 @@ def _load_dataset() -> tuple[Any, List[Any]]:
     return default_profile, list(programs)
 
 
-# ---------------------------------------------------------------------------
-# Style CSS (Palette Rallyo : Bleu nuit #0B1B33 + Orange vif #FF5A1F)
-# ---------------------------------------------------------------------------
 RALLYO_CSS = """
 <style>
     :root {
@@ -236,20 +233,30 @@ RALLYO_CSS = """
 """
 
 
-def _status_badge_html(status: str, days_left: int | None) -> str:
+def _status_badge_html(status: str, days_left: int | None, lang: str) -> str:
     st_low = status.lower()
     if st_low == "urgent":
-        lbl = f"🔥 Ferme bientôt ({days_left} j)" if days_left is not None else "🔥 Ferme bientôt"
+        lbl = (
+            t("badge_urgent_days", lang, days=days_left)
+            if days_left is not None
+            else t("badge_urgent", lang)
+        )
         return f'<span class="badge badge-urgent">{html.escape(lbl)}</span>'
     if st_low == "open":
-        lbl = f"✅ Ouvert ({days_left} j)" if days_left is not None else "✅ Ouvert"
+        lbl = (
+            t("badge_open_days", lang, days=days_left)
+            if days_left is not None
+            else t("badge_open", lang)
+        )
         return f'<span class="badge badge-open">{html.escape(lbl)}</span>'
     if st_low == "closed":
-        return '<span class="badge badge-closed">🔒 Fermé</span>'
-    return '<span class="badge badge-watch">👀 À surveiller</span>'
+        return f'<span class="badge badge-closed">{html.escape(t("badge_closed", lang))}</span>'
+    return f'<span class="badge badge-watch">{html.escape(t("badge_watch", lang))}</span>'
 
 
 def _init_session_state(default_profile: Any) -> None:
+    if "lang" not in st.session_state:
+        st.session_state.lang = "fr"
     if "active_profile" not in st.session_state:
         st.session_state.active_profile = default_profile
     if "using_custom_profile" not in st.session_state:
@@ -262,22 +269,22 @@ def _init_session_state(default_profile: Any) -> None:
         st.session_state.onboarding_answers = {}
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = [
-            {"role": "assistant", "content": QUESTIONS[0]}
+            {"role": "assistant", "content": get_questions(st.session_state.lang)[0]}
         ]
 
 
-def _reset_onboarding() -> None:
+def _reset_onboarding(lang: str) -> None:
     st.session_state.show_onboarding = True
     st.session_state.onboarding_step = 0
     st.session_state.onboarding_answers = {}
     st.session_state.chat_history = [
-        {"role": "assistant", "content": QUESTIONS[0]}
+        {"role": "assistant", "content": get_questions(lang)[0]}
     ]
 
 
 def main() -> None:
     st.set_page_config(
-        page_title="ATS Quant Job Radar v2.0",
+        page_title="ATS Quant Job Radar v2.1",
         page_icon="🎯",
         layout="wide",
     )
@@ -285,6 +292,33 @@ def main() -> None:
 
     default_profile, programs = _load_dataset()
     _init_session_state(default_profile)
+
+    # -----------------------------------------------------------------------
+    # SÉLECTEUR DE LANGUE (Tout en haut de la sidebar — persistant sans reset du profil)
+    # -----------------------------------------------------------------------
+    lang_options = {"fr": "🇫🇷 Français", "en": "🇬🇧 English"}
+    current_lang = st.session_state.lang
+    selected_lang = st.sidebar.radio(
+        t("lang_selector_label", current_lang),
+        options=["fr", "en"],
+        format_func=lambda code: lang_options[code],
+        index=0 if current_lang == "fr" else 1,
+        horizontal=True,
+    )
+    if selected_lang != current_lang:
+        st.session_state.lang = selected_lang
+        # Si l'utilisateur n'a pas encore commencé à répondre dans le chat (étape 0, 1 seul message),
+        # on met à jour la première question d'accueil dans la nouvelle langue choisie.
+        if (
+            st.session_state.onboarding_step == 0
+            and len(st.session_state.chat_history) == 1
+        ):
+            st.session_state.chat_history = [
+                {"role": "assistant", "content": get_questions(selected_lang)[0]}
+            ]
+        st.rerun()
+
+    lang = st.session_state.lang
     profile = st.session_state.active_profile
     today = date.today()
 
@@ -292,11 +326,11 @@ def main() -> None:
     # HERO BANNER
     # -----------------------------------------------------------------------
     st.markdown(
-        """
+        f"""
         <div class="radar-hero">
-            <span class="hero-tag">Radar v2.0 • Finance, Quant & Tech</span>
-            <h1>🎯 ATS Quant Job Radar</h1>
-            <p>Identifie instantanément les programmes de stages auxquels tu es réellement admissible selon ton année d'études, ta date de diplomation et ton statut de visa.</p>
+            <span class="hero-tag">{html.escape(t("hero_tag", lang))}</span>
+            <h1>{html.escape(t("hero_title", lang))}</h1>
+            <p>{html.escape(t("hero_subtitle", lang))}</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -304,38 +338,45 @@ def main() -> None:
 
     hero_col1, hero_col2, hero_col3 = st.columns([2, 2, 4])
     with hero_col1:
-        if st.button("🎯 Trouver mes stages (Assistant Radar)", type="primary", use_container_width=True):
-            _reset_onboarding()
+        if st.button(t("btn_find_internships", lang), type="primary", use_container_width=True):
+            _reset_onboarding(lang)
             st.rerun()
     with hero_col2:
         if st.session_state.using_custom_profile:
-            if st.button("🔄 Revenir au profil d'exemple", use_container_width=True):
+            if st.button(t("btn_reset_profile", lang), use_container_width=True):
                 st.session_state.active_profile = default_profile
                 st.session_state.using_custom_profile = False
                 st.session_state.show_onboarding = False
                 st.rerun()
         else:
-            if st.button("✏️ Modifier mon profil", use_container_width=True):
-                _reset_onboarding()
+            if st.button(t("btn_edit_profile", lang), use_container_width=True):
+                _reset_onboarding(lang)
                 st.rerun()
     with hero_col3:
         prof_name = getattr(profile, "name", "Profil")
-        prof_yr = getattr(profile, "current_year", 1)
-        yr_str = "1re année" if prof_yr == 1 else f"{prof_yr}e année"
+        prof_yr = int(getattr(profile, "current_year", 1))
         prof_grad = str(getattr(profile, "graduation", ""))[:7]
         prof_city = getattr(profile, "home_base", "Montréal")
-        prof_us = "Oui" if getattr(profile, "us_work_auth", False) else "Non"
+        prof_us = t("yes", lang) if getattr(profile, "us_work_auth", False) else t("no", lang)
         st.info(
-            f"**Profil actif :** {prof_name} • {yr_str} • Diplomation `{prof_grad}` • Base : **{prof_city}** • Autorisation US : **{prof_us}**"
+            t(
+                "active_profile_banner",
+                lang,
+                name=prof_name,
+                year_label=format_year_label(prof_yr, lang),
+                grad=prof_grad,
+                city=prof_city,
+                us=prof_us,
+            )
         )
 
     # -----------------------------------------------------------------------
-    # A. ONBOARDING CONVERSATIONNEL AVEC AVATAR « RADAR »
+    # A. ONBOARDING CONVERSATIONNEL BILINGUE AVEC AVATAR « RADAR »
     # -----------------------------------------------------------------------
     if st.session_state.show_onboarding:
         with st.container(border=True):
-            st.subheader("🎯 Onboarding interactif avec Radar")
-            st.caption("Réponds aux 5 questions une par une dans le chat ci-dessous (100 % local, sans clé API).")
+            st.subheader(t("onboarding_title", lang))
+            st.caption(t("onboarding_caption", lang))
 
             for msg in st.session_state.chat_history:
                 avatar = "🎯" if msg["role"] == "assistant" else "🧑‍🎓"
@@ -344,37 +385,40 @@ def main() -> None:
 
             step = st.session_state.onboarding_step
 
-            # Raccourcis visuels optionnels pour faciliter la saisie sur mobile
             if step == 2:
-                st.caption("💡 Tags disponibles : " + ", ".join(f"`{t}`" for t in AVAILABLE_INTERESTS))
+                st.caption(
+                    t("onboarding_tags_hint", lang)
+                    + ", ".join(f"`{tag}`" for tag in AVAILABLE_INTERESTS)
+                )
 
             if step < 5:
-                user_msg = st.chat_input("Écris ta réponse ici...")
+                user_msg = st.chat_input(t("chat_input_placeholder", lang))
                 if user_msg:
                     st.session_state.chat_history.append({"role": "user", "content": user_msg})
                     next_step, updated_ans, reply = process_onboarding_step(
                         step,
                         user_msg,
                         st.session_state.onboarding_answers,
+                        lang=lang,
                     )
                     st.session_state.onboarding_step = next_step
                     st.session_state.onboarding_answers = updated_ans
                     st.session_state.chat_history.append({"role": "assistant", "content": reply})
 
                     if next_step == 5:
-                        new_prof = build_profile_from_answers(updated_ans, default_profile)
+                        new_prof = build_profile_from_answers(updated_ans, default_profile, lang=lang)
                         st.session_state.active_profile = new_prof
                         st.session_state.using_custom_profile = True
                     st.rerun()
             else:
                 col_done1, col_done2 = st.columns([1, 1])
                 with col_done1:
-                    if st.button("✅ Voir mes résultats personnalisés", type="primary", use_container_width=True):
+                    if st.button(t("btn_see_results", lang), type="primary", use_container_width=True):
                         st.session_state.show_onboarding = False
                         st.rerun()
                 with col_done2:
-                    if st.button("🔁 Recommencer les 5 questions", use_container_width=True):
-                        _reset_onboarding()
+                    if st.button(t("btn_restart_onboarding", lang), use_container_width=True):
+                        _reset_onboarding(lang)
                         st.rerun()
 
     # -----------------------------------------------------------------------
@@ -387,9 +431,9 @@ def main() -> None:
         st.markdown(
             f"""
             <div class="kpi-card accent">
-                <div class="kpi-label">Programmes admissibles</div>
+                <div class="kpi-label">{html.escape(t("kpi_eligible_label", lang))}</div>
                 <div class="kpi-value">{kpis['eligible_count']} / {kpis['total_count']}</div>
-                <div class="kpi-sub">Selon ton année, diplomation & visa</div>
+                <div class="kpi-sub">{html.escape(t("kpi_eligible_sub", lang))}</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -398,22 +442,26 @@ def main() -> None:
         st.markdown(
             f"""
             <div class="kpi-card">
-                <div class="kpi-label">Deadlines ≤ 30 jours</div>
+                <div class="kpi-label">{html.escape(t("kpi_deadlines_label", lang))}</div>
                 <div class="kpi-value">{kpis['deadlines_30d']}</div>
-                <div class="kpi-sub">Programmes ouverts à candidater</div>
+                <div class="kpi-sub">{html.escape(t("kpi_deadlines_sub", lang))}</div>
             </div>
             """,
             unsafe_allow_html=True,
         )
     with k_col3:
         nxt_days = kpis["next_deadline_days"]
-        nxt_str = f"J-{nxt_days}" if nxt_days is not None else "Aucune fixe"
+        nxt_str = (
+            t("kpi_next_days", lang, days=nxt_days)
+            if nxt_days is not None
+            else t("kpi_next_none", lang)
+        )
         st.markdown(
             f"""
             <div class="kpi-card accent">
-                <div class="kpi-label">Prochaine deadline</div>
-                <div class="kpi-value">{nxt_str}</div>
-                <div class="kpi-sub">Compte à rebours prioritaire</div>
+                <div class="kpi-label">{html.escape(t("kpi_next_label", lang))}</div>
+                <div class="kpi-value">{html.escape(nxt_str)}</div>
+                <div class="kpi-sub">{html.escape(t("kpi_next_sub", lang))}</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -422,9 +470,9 @@ def main() -> None:
         st.markdown(
             f"""
             <div class="kpi-card">
-                <div class="kpi-label">Bureaux à Montréal</div>
+                <div class="kpi-label">{html.escape(t("kpi_montreal_label", lang))}</div>
                 <div class="kpi-value">{kpis['montreal_count']}</div>
-                <div class="kpi-sub">Opportunités locales recensées</div>
+                <div class="kpi-sub">{html.escape(t("kpi_montreal_sub", lang))}</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -438,16 +486,17 @@ def main() -> None:
         u_dl = html.escape(str(getattr(urgent_prog, "deadline", "")))
         u_days = kpis["next_deadline_days"]
         u_url = html.escape(str(getattr(urgent_prog, "apply_url", "#")))
+        u_info_html = t("urgent_deadline_info", lang, deadline=u_dl, days=u_days)
         st.markdown(
             f"""
             <div class="urgent-banner">
                 <div>
-                    <strong>⚡ Prochaine échéance :</strong> {u_firm} — <strong>{u_title}</strong>
-                    (Date limite : <code>{u_dl}</code>, dans <strong>{u_days} jour(s)</strong>)
+                    <strong>{html.escape(t("urgent_prefix", lang))}</strong> {u_firm} — <strong>{u_title}</strong>
+                    {u_info_html}
                 </div>
                 <div>
                     <a href="{u_url}" target="_blank" style="background:#FF5A1F;color:#FFF;padding:0.45rem 0.95rem;border-radius:8px;text-decoration:none;font-weight:700;">
-                        Postuler sur le site officiel ↗
+                        {html.escape(t("urgent_cta", lang))}
                     </a>
                 </div>
             </div>
@@ -456,63 +505,61 @@ def main() -> None:
         )
 
     # Graphiques natifs : répartition par catégorie et par statut de deadline
-    with st.expander("📊 Voir la répartition du marché (Catégories & Statuts des deadlines)", expanded=False):
+    with st.expander(t("charts_expander", lang), expanded=False):
         g_col1, g_col2 = st.columns(2)
         with g_col1:
-            st.markdown("**Programmes par catégorie**")
+            st.markdown(t("chart_by_category", lang))
             st.bar_chart(kpis["by_category"], color="#0B1B33")
         with g_col2:
-            st.markdown("**Programmes par statut de deadline**")
-            status_fr = {
-                "Ouvert": kpis["by_status"].get("open", 0),
-                "Ferme bientôt (≤14j)": kpis["by_status"].get("urgent", 0),
-                "À surveiller": kpis["by_status"].get("watch", 0),
-                "Fermé": kpis["by_status"].get("closed", 0),
+            st.markdown(t("chart_by_status", lang))
+            status_localized = {
+                t("status_open_chart", lang): kpis["by_status"].get("open", 0),
+                t("status_urgent_chart", lang): kpis["by_status"].get("urgent", 0),
+                t("status_watch_chart", lang): kpis["by_status"].get("watch", 0),
+                t("status_closed_chart", lang): kpis["by_status"].get("closed", 0),
             }
-            st.bar_chart(status_fr, color="#FF5A1F")
+            st.bar_chart(status_localized, color="#FF5A1F")
 
     # Bandeau d'honnêteté sur les données
     verified_total = sum(1 for p in programs if getattr(p, "verified", False))
     unverified_total = len(programs) - verified_total
     st.markdown(
-        f"""
-        <div class="honesty-box">
-            <strong>🛡️ Transparence des données :</strong> Ce radar repose sur un dataset curé manuellement ({len(programs)} programmes, aucun scraping).
-            <strong>{verified_total}</strong> programme(s) sont confirmés pour le cycle en cours et <strong>{unverified_total}</strong> sont étiquetés
-            <em>« à vérifier sur la page officielle »</em>. Vérifie toujours les dates sur le portail de l'employeur.
-        </div>
-        """,
+        f'<div class="honesty-box">{t("honesty_box_html", lang, total=len(programs), verified=verified_total, unverified=unverified_total)}</div>',
         unsafe_allow_html=True,
     )
 
     # -----------------------------------------------------------------------
-    # FILTRES EN SIDEBAR (conservation de tous les filtres existants)
+    # FILTRES EN SIDEBAR
     # -----------------------------------------------------------------------
-    st.sidebar.header("🔎 Filtres de recherche")
+    st.sidebar.divider()
+    st.sidebar.header(t("sidebar_header", lang))
 
     all_sessions = sorted({s for p in programs for s in (getattr(p, "sessions", []) or [])})
     all_categories = sorted({str(getattr(p, "category", "")) for p in programs if getattr(p, "category", "")})
     all_locations = sorted({loc for p in programs for loc in (getattr(p, "locations", []) or [])})
 
-    search_query = st.sidebar.text_input("Recherche (entreprise, mot-clé)", value="")
-    selected_session = st.sidebar.selectbox("Session", ["Toutes"] + all_sessions)
-    selected_category = st.sidebar.selectbox("Catégorie", ["Toutes"] + all_categories)
-    selected_location = st.sidebar.selectbox("Lieu", ["Tous"] + all_locations)
+    all_f_label = t("filter_all_f", lang)
+    all_m_label = t("filter_all_m", lang)
 
-    only_paid = st.sidebar.checkbox("Rémunéré uniquement", value=False)
-    only_eligible = st.sidebar.checkbox("Admissible uniquement", value=False)
-    only_first_year = st.sidebar.checkbox("Ouvert aux 1re année (min_year ≤ 1)", value=False)
+    search_query = st.sidebar.text_input(t("filter_search", lang), value="")
+    selected_session = st.sidebar.selectbox(t("filter_session", lang), [all_f_label] + all_sessions)
+    selected_category = st.sidebar.selectbox(t("filter_category", lang), [all_f_label] + all_categories)
+    selected_location = st.sidebar.selectbox(t("filter_location", lang), [all_m_label] + all_locations)
+
+    only_paid = st.sidebar.checkbox(t("filter_only_paid", lang), value=False)
+    only_eligible = st.sidebar.checkbox(t("filter_only_eligible", lang), value=False)
+    only_first_year = st.sidebar.checkbox(t("filter_only_first_year", lang), value=False)
 
     # Filtrage des programmes
     filtered_programs: List[tuple[Any, Any]] = []
     for prog in programs:
-        bd = explain_score(profile, prog)
+        bd = explain_score(profile, prog, lang=lang)
 
-        if selected_session != "Toutes" and selected_session not in (getattr(prog, "sessions", []) or []):
+        if selected_session != all_f_label and selected_session not in (getattr(prog, "sessions", []) or []):
             continue
-        if selected_category != "Toutes" and str(getattr(prog, "category", "")) != selected_category:
+        if selected_category != all_f_label and str(getattr(prog, "category", "")) != selected_category:
             continue
-        if selected_location != "Tous" and selected_location not in (getattr(prog, "locations", []) or []):
+        if selected_location != all_m_label and selected_location not in (getattr(prog, "locations", []) or []):
             continue
         if only_paid and not getattr(prog, "paid", False):
             continue
@@ -528,7 +575,6 @@ def main() -> None:
 
         filtered_programs.append((prog, bd))
 
-    # Tri par score décroissant puis par nom d'entreprise
     filtered_programs.sort(key=lambda item: (-item[1].total, str(getattr(item[0], "firm", ""))))
 
     # -----------------------------------------------------------------------
@@ -537,15 +583,15 @@ def main() -> None:
     tracked_map = get_all_tracked()
 
     tab_all, tab_blockers, tab_tracker = st.tabs([
-        f"🎯 Programmes & Scores ({len(filtered_programs)})",
-        "🚧 Ce qui te bloque (Plan d'action)",
-        f"📋 Suivi de candidatures ({len(tracked_map)})",
+        t("tab_programs", lang, count=len(filtered_programs)),
+        t("tab_blockers", lang),
+        t("tab_tracker", lang, count=len(tracked_map)),
     ])
 
     # --- ONGLET 1 : PROGRAMMES & SCORE EXPLIQUÉ ---
     with tab_all:
         if not filtered_programs:
-            st.warning("Aucun programme ne correspond aux filtres sélectionnés.")
+            st.warning(t("no_programs_match", lang))
         for prog, bd in filtered_programs:
             pid = str(getattr(prog, "id", f"{getattr(prog, 'firm', '')}-{getattr(prog, 'program', '')}"))
             firm = str(getattr(prog, "firm", ""))
@@ -557,11 +603,11 @@ def main() -> None:
             st_code = _safe_deadline_status(prog, today)
             d_left = _safe_days_until(prog, today)
 
-            badge_html = _status_badge_html(st_code, d_left)
+            badge_html = _status_badge_html(st_code, d_left, lang)
             verif_html = (
-                '<span class="badge badge-verified">✓ Vérifié</span>'
+                f'<span class="badge badge-verified">{html.escape(t("badge_verified", lang))}</span>'
                 if is_verified
-                else '<span class="badge badge-unverified">⚠️ À vérifier sur la page officielle</span>'
+                else f'<span class="badge badge-unverified">{html.escape(t("badge_unverified", lang))}</span>'
             )
             score_cls = "score-pill" if bd.eligible else "score-pill zero"
 
@@ -587,71 +633,87 @@ def main() -> None:
                 unsafe_allow_html=True,
             )
 
-            with st.expander(f"Détails du score, admissibilité & suivi — {firm} ({title})"):
+            with st.expander(t("expander_program_details", lang, firm=firm, title=title)):
                 c_left, c_right = st.columns([3, 2])
                 with c_left:
                     if bd.eligible:
-                        st.markdown("#### ✅ Admissible — Décomposition du score")
+                        st.markdown(t("eligible_header", lang))
                         st.progress(bd.total / 100.0)
+                        tags_str = (
+                            "(" + ", ".join(bd.shared_interests) + ")"
+                            if bd.shared_interests
+                            else t("no_shared_tags", lang)
+                        )
                         st.markdown(
-                            f"- **Admissibilité validée :** `+{bd.base_points} pts`\n"
-                            f"- **Intérêts partagés ({len(bd.shared_interests)}) :** `+{bd.interest_points} pts` "
-                            f"{'(' + ', '.join(bd.shared_interests) + ')' if bd.shared_interests else '(aucun tag commun)'}\n"
-                            f"- **Ville cible ({ getattr(profile, 'home_base', '') }) :** `+{bd.location_points} pts`\n"
-                            f"- **Stage rémunéré :** `+{bd.paid_points} pts`\n"
-                            f"- **Total :** **{bd.total} / 100**"
+                            "\n".join([
+                                t("score_base_line", lang, pts=bd.base_points),
+                                t("score_interests_line", lang, count=len(bd.shared_interests), pts=bd.interest_points, tags=tags_str),
+                                t("score_location_line", lang, city=getattr(profile, "home_base", ""), pts=bd.location_points),
+                                t("score_paid_line", lang, pts=bd.paid_points),
+                                t("score_total_line", lang, total=bd.total),
+                            ])
                         )
                     else:
-                        st.markdown("#### ❌ Non admissible (Score : 0 / 100)")
+                        st.markdown(t("ineligible_header", lang))
                         for r in bd.reasons:
                             st.error(f"• {r}")
-                        st.info(f"💡 **Action recommandée :** {bd.action_hint}")
+                        st.info(t("recommended_action_label", lang, hint=bd.action_hint))
 
-                    dl_val = getattr(prog, "deadline", None) or "Non spécifiée"
+                    dl_val = getattr(prog, "deadline", None) or t("deadline_unspecified", lang)
                     dl_note = getattr(prog, "deadline_note", None) or ""
                     notes_txt = getattr(prog, "notes", None) or ""
-                    st.markdown(f"**Date limite :** `{dl_val}` {f'— *{dl_note}*' if dl_note else ''}")
+                    st.markdown(
+                        t(
+                            "deadline_label",
+                            lang,
+                            dl=dl_val,
+                            note=f"— *{dl_note}*" if dl_note else "",
+                        )
+                    )
                     if notes_txt:
-                        st.caption(f"Note : {notes_txt}")
+                        st.caption(t("note_prefix", lang, notes=notes_txt))
 
                     apply_url = getattr(prog, "apply_url", None)
                     if apply_url:
-                        st.link_button("🌐 Ouvrir la page officielle de candidature", str(apply_url))
+                        st.link_button(t("btn_official_apply", lang), str(apply_url))
 
                 with c_right:
-                    st.markdown("#### 📌 Suivre cette candidature")
+                    st.markdown(t("track_section_header", lang))
                     current_track = tracked_map.get(pid, {"status": "Non suivi", "notes": ""})
-                    cur_status = current_track["status"] if current_track["status"] in VALID_STATUSES else "Non suivi"
+                    cur_status_fr = (
+                        current_track["status"]
+                        if current_track["status"] in VALID_STATUSES
+                        else "Non suivi"
+                    )
 
-                    new_status = st.selectbox(
-                        "Statut",
-                        VALID_STATUSES,
-                        index=VALID_STATUSES.index(cur_status),
+                    new_status_fr = st.selectbox(
+                        t("track_status_label", lang),
+                        options=VALID_STATUSES,
+                        format_func=lambda s: status_to_display(s, lang=lang),
+                        index=VALID_STATUSES.index(cur_status_fr),
                         key=f"status_{pid}",
                     )
                     new_note = st.text_input(
-                        "Note personnelle",
+                        t("track_note_label", lang),
                         value=current_track.get("notes", ""),
-                        placeholder="Ex: Référé par un alumnus, CV envoyé...",
+                        placeholder=t("track_note_placeholder", lang),
                         key=f"note_{pid}",
                     )
-                    if st.button("💾 Enregistrer le suivi", key=f"save_{pid}", use_container_width=True):
-                        set_application_status(pid, new_status, new_note)
-                        st.success("Suivi mis à jour dans SQLite !")
+                    if st.button(t("btn_save_tracking", lang), key=f"save_{pid}", use_container_width=True):
+                        set_application_status(pid, new_status_fr, new_note)
+                        st.success(t("msg_tracking_saved", lang))
                         st.rerun()
 
     # --- ONGLET 2 : VUE « CE QUI TE BLOQUE » ---
     with tab_blockers:
-        st.subheader("🚧 Programmes actuellement inaccessibles — et comment les débloquer")
-        st.caption(
-            "Un « non » aujourd'hui prépare ta stratégie de l'an prochain. Voici pourquoi ces programmes te bloquent et l'action concrète associée."
-        )
+        st.subheader(t("blockers_header", lang))
+        st.caption(t("blockers_caption", lang))
 
-        ineligible_list = [(p, explain_score(profile, p)) for p in programs]
+        ineligible_list = [(p, explain_score(profile, p, lang=lang)) for p in programs]
         ineligible_list = [(p, b) for p, b in ineligible_list if not b.eligible]
 
         if not ineligible_list:
-            st.success("🎉 Félicitations ! Tu es admissible à l'intégralité des programmes du radar.")
+            st.success(t("blockers_none", lang))
         else:
             for prog, bd in ineligible_list:
                 firm = str(getattr(prog, "firm", ""))
@@ -661,23 +723,28 @@ def main() -> None:
                     b_col1, b_col2 = st.columns([3, 2])
                     with b_col1:
                         st.markdown(f"**{firm} — {title}**")
-                        st.markdown(f"🔴 **Raison(s) du blocage :** {reasons_str}")
+                        st.markdown(t("blocker_reason_prefix", lang, reasons=reasons_str))
                     with b_col2:
-                        st.markdown(f"🎯 **Action concrète :**\n\n`{bd.action_hint}`")
+                        st.markdown(t("blocker_action_prefix", lang, hint=bd.action_hint))
 
-    # --- ONGLET 3 : SUIVI DE CANDIDATURES (SQLITE + EXPORT CSV) ---
+    # --- ONGLET 3 : SUIVI DE CANDIDATURES (SQLITE + EXPORT CSV BILINGUE) ---
     with tab_tracker:
-        st.subheader("📋 Mes candidatures suivies (Base SQLite locale)")
-        csv_data = export_tracked_to_csv(programs)
+        st.subheader(t("tracker_tab_header", lang))
+        csv_data = export_tracked_to_csv(programs, lang=lang)
 
         t_col1, t_col2 = st.columns([3, 1])
         with t_col1:
-            st.caption("Les statuts sont sauvegardés localement via `sqlite3` sans jamais modifier `data/programs.yaml`.")
+            st.caption(t("tracker_tab_caption", lang))
         with t_col2:
+            csv_filename = (
+                f"radar_applications_{today.isoformat()}.csv"
+                if lang == "en"
+                else f"radar_candidatures_{today.isoformat()}.csv"
+            )
             st.download_button(
-                label="📥 Exporter en CSV",
+                label=t("btn_export_csv", lang),
                 data=csv_data.encode("utf-8"),
-                file_name=f"radar_candidatures_{today.isoformat()}.csv",
+                file_name=csv_filename,
                 mime="text/csv",
                 use_container_width=True,
             )
@@ -687,18 +754,18 @@ def main() -> None:
         }
 
         if not active_tracked:
-            st.info("Tu n'as encore suivi aucun programme. Ouvre les détails d'un programme dans le premier onglet pour lui attribuer un statut (À postuler, Postulé, Entretien, Offre, Refusé).")
+            st.info(t("tracker_empty_msg", lang))
         else:
             prog_by_id = {str(getattr(p, "id", "")): p for p in programs}
             rows_display = []
             for pid, info in active_tracked.items():
                 p_obj = prog_by_id.get(pid)
                 rows_display.append({
-                    "Entreprise": getattr(p_obj, "firm", pid) if p_obj else pid,
-                    "Programme": getattr(p_obj, "program", "") if p_obj else "",
-                    "Statut": info["status"],
-                    "Notes": info["notes"],
-                    "Mise à jour (UTC)": info["updated_at"],
+                    t("col_firm", lang): getattr(p_obj, "firm", pid) if p_obj else pid,
+                    t("col_program", lang): getattr(p_obj, "program", "") if p_obj else "",
+                    t("col_status", lang): status_to_display(info["status"], lang=lang),
+                    t("col_notes", lang): info["notes"],
+                    t("col_updated", lang): info["updated_at"],
                 })
             st.dataframe(rows_display, use_container_width=True, hide_index=True)
 

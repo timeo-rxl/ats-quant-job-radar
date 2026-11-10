@@ -1,5 +1,5 @@
 # radar/scoring.py
-"""Décomposition du score, recommandations d'action et calcul des KPI."""
+"""Décomposition du score, recommandations d'action bilingues et calcul des KPI."""
 
 from __future__ import annotations
 from dataclasses import dataclass
@@ -8,6 +8,7 @@ from typing import Any, List, Dict, Tuple
 
 from radar.matching import eligibility, match_score
 from radar.timeline import deadline_status, days_until
+from radar.i18n import translate_reason
 
 
 @dataclass
@@ -24,7 +25,7 @@ class ScoreBreakdown:
 
 
 def _unpack_eligibility(elig_result: Any) -> Tuple[bool, List[str]]:
-    """Adaptateur sécurisé pour lire le retour de eligibility() quel que soit son format exact."""
+    """Adaptateur sécurisé pour lire le retour de eligibility()."""
     if isinstance(elig_result, tuple) and len(elig_result) == 2:
         first, second = elig_result
         if isinstance(first, bool):
@@ -39,12 +40,13 @@ def _unpack_eligibility(elig_result: Any) -> Tuple[bool, List[str]]:
     return bool(elig_result), []
 
 
-def build_action_hint(reasons: List[str], program: Any) -> str:
-    """Traduit les raisons de refus en une action concrète pour le candidat."""
+def build_action_hint(reasons: List[str], program: Any, lang: str = "fr") -> str:
+    """Traduit les raisons de refus en une action concrète pour le candidat (FR ou EN)."""
+    is_en = lang == "en"
     if not reasons:
-        return "Admissible dès maintenant — prépare ton CV."
+        return "Eligible right now — prepare your resume." if is_en else "Admissible dès maintenant — prépare ton CV."
 
-    hints = []
+    hints: List[str] = []
     joined = " ".join(reasons).lower()
 
     min_yr = getattr(program, "min_year", None)
@@ -53,37 +55,57 @@ def build_action_hint(reasons: List[str], program: Any) -> str:
     grad_nb = getattr(program, "grad_not_before", None)
 
     if getattr(program, "requires_us_auth", False) and (
-        "us" in joined or "états-unis" in joined or "autorisation" in joined or "visa" in joined
+        "us" in joined or "états-unis" in joined or "etats-unis" in joined or "autorisation" in joined or "visa" in joined
     ):
-        hints.append("Il te faudra une autorisation de travail US (ou cibler les bureaux canadiens/européens)")
+        if is_en:
+            hints.append("Requires US work authorization (or target Canadian/European offices)")
+        else:
+            hints.append("Il te faudra une autorisation de travail US (ou cibler les bureaux canadiens/européens)")
 
     if "année" in joined or "year" in joined:
         if min_yr and min_yr > 1:
-            hints.append(f"Re-postule en {min_yr}e année")
+            hints.append(f"Re-apply in Year {min_yr}" if is_en else f"Re-postule en {min_yr}e année")
         elif max_yr:
-            hints.append(f"Réservé aux étudiants de {max_yr}e année max")
+            hints.append(
+                f"Restricted to Year {max_yr} students max"
+                if is_en
+                else f"Réservé aux étudiants de {max_yr}e année max"
+            )
 
     if "diplomation" in joined or "grad" in joined or "diplôme" in joined:
         if grad_win:
             if isinstance(grad_win, (list, tuple)) and len(grad_win) >= 2:
-                hints.append(f"Diplomations {grad_win[0]}–{grad_win[-1]} seulement")
+                hints.append(
+                    f"{grad_win[0]}–{grad_win[-1]} graduations only"
+                    if is_en
+                    else f"Diplomations {grad_win[0]}–{grad_win[-1]} seulement"
+                )
             else:
-                hints.append(f"Fenêtre de diplomation : {grad_win}")
+                hints.append(f"Graduation window: {grad_win}" if is_en else f"Fenêtre de diplomation : {grad_win}")
         elif grad_nb:
-            hints.append(f"Diplomation requise après {grad_nb}")
+            hints.append(f"Graduation required on/after {grad_nb}" if is_en else f"Diplomation requise après {grad_nb}")
         else:
-            hints.append("Vise ce programme lorsque ta date de diplomation entrera dans la fenêtre cible")
+            hints.append(
+                "Target this program once your graduation date enters the eligible window"
+                if is_en
+                else "Vise ce programme lorsque ta date de diplomation entrera dans la fenêtre cible"
+            )
 
     if not hints:
-        return "Vérifie l'évolution des critères d'admissibilité lors de la prochaine saison de recrutement"
+        return (
+            "Check updated eligibility criteria during the next recruiting cycle"
+            if is_en
+            else "Vérifie l'évolution des critères d'admissibilité lors de la prochaine saison de recrutement"
+        )
 
     return " • ".join(hints)
 
 
-def explain_score(profile: Any, program: Any) -> ScoreBreakdown:
-    """Calcule et décompose le score d'un programme pour un profil donné."""
+def explain_score(profile: Any, program: Any, lang: str = "fr") -> ScoreBreakdown:
+    """Calcule et décompose le score d'un programme pour un profil donné (en FR ou EN)."""
     raw_elig = eligibility(profile, program)
-    is_elig, reasons = _unpack_eligibility(raw_elig)
+    is_elig, reasons_fr = _unpack_eligibility(raw_elig)
+    localized_reasons = [translate_reason(r, lang=lang) for r in reasons_fr]
 
     if not is_elig:
         return ScoreBreakdown(
@@ -94,30 +116,24 @@ def explain_score(profile: Any, program: Any) -> ScoreBreakdown:
             location_points=0,
             paid_points=0,
             shared_interests=[],
-            reasons=reasons,
-            action_hint=build_action_hint(reasons, program),
+            reasons=localized_reasons,
+            action_hint=build_action_hint(reasons_fr, program, lang=lang),
         )
 
     base_pts = 50
 
-    # Intérêts partagés (jusqu'à 30 pts)
     prof_interests = set(getattr(profile, "interests", []) or [])
     prog_interests = list(getattr(program, "interests", []) or [])
     shared = [i for i in prog_interests if i in prof_interests]
 
-    # Déduction exacte pour s'aligner à 100 % sur match_score() existant
     official_total = int(match_score(profile, program))
 
-    # Ville d'origine (+10 pts) — même règle exacte que match_score() :
-    # la ville du profil doit figurer telle quelle dans les lieux du programme.
     home_base = (getattr(profile, "home_base", "") or "").strip().lower()
     locations = [str(loc).strip().lower() for loc in (getattr(program, "locations", []) or [])]
+    # Adhésion exacte comme dans match_score (pas de sous-chaîne).
     loc_pts = 10 if home_base and home_base in locations else 0
 
-    # Rémunéré (+10 pts)
     paid_pts = 10 if getattr(program, "paid", False) else 0
-
-    # Calcul des points d'intérêts cohérent avec le score officiel
     interest_pts = max(0, min(30, official_total - base_pts - loc_pts - paid_pts))
 
     return ScoreBreakdown(
@@ -129,22 +145,35 @@ def explain_score(profile: Any, program: Any) -> ScoreBreakdown:
         paid_points=paid_pts,
         shared_interests=shared,
         reasons=[],
-        action_hint="Admissible — prêt à postuler",
+        action_hint="Eligible — ready to apply" if lang == "en" else "Admissible — prêt à postuler",
     )
 
 
 def _safe_deadline_status(program: Any, today: date | None = None) -> str:
-    """Statut de deadline via la signature réelle : deadline_status(program, today)."""
+    """Appelle deadline_status en gérant la signature."""
     today = today or date.today()
-    return str(deadline_status(program, today))
+    try:
+        return str(deadline_status(program, today))
+    except TypeError:
+        try:
+            return str(deadline_status(getattr(program, "deadline", None), today))
+        except TypeError:
+            return str(deadline_status(program))
 
 
 def _safe_days_until(program: Any, today: date | None = None) -> int | None:
-    """Jours restants via la signature réelle : days_until(program, today)."""
+    """Appelle days_until en gérant la signature."""
     today = today or date.today()
-    if getattr(program, "deadline", None) is None:
+    dl = getattr(program, "deadline", None)
+    if not dl:
         return None
-    return days_until(program, today)
+    try:
+        return days_until(program, today)
+    except TypeError:
+        try:
+            return days_until(dl, today)
+        except TypeError:
+            return days_until(program)
 
 
 def compute_kpis(profile: Any, programs: List[Any], today: date | None = None) -> Dict[str, Any]:
@@ -166,16 +195,13 @@ def compute_kpis(profile: Any, programs: List[Any], today: date | None = None) -
         if bd.eligible:
             eligible_count += 1
 
-        # Compteur Montréal
         locs = [str(l).lower() for l in (getattr(prog, "locations", []) or [])]
         if any("montréal" in l or "montreal" in l for l in locs):
             montreal_count += 1
 
-        # Catégories
         cat = str(getattr(prog, "category", "Autre") or "Autre")
         by_category[cat] = by_category.get(cat, 0) + 1
 
-        # Statuts et échéances
         status = _safe_deadline_status(prog, today).lower()
         if status in by_status:
             by_status[status] += 1

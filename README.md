@@ -52,6 +52,31 @@ The demo is now a full interactive app, not just filters:
   status badges. Same honest data, now verified: **19 programmes
   verified on official pages (10 Nov 2026), 12 left to verify**.
 
+## v2.1 — bilingual FR / EN (10 Nov 2026)
+
+The whole app now speaks French and English, with a visible toggle
+(🌐 Français / English) at the top of the sidebar. The language
+switches instantly and never resets the visitor's profile or their
+tracked applications:
+
+- **Full UI translation** — hero, KPI dashboard, tabs, filters,
+  badges, score breakdown, blockers view, tracker — via
+  `radar/i18n.py` (one `STRINGS` dictionary, French fallback).
+- **Onboarding in English too** — the 5 questions, and the parsers
+  accept English answers: `freshman` / `sophomore` / `junior` /
+  `senior`, `1st year` … `4th year`, English months (`May 2029`),
+  `yes` / `no`, English interest aliases (`banking`, `trading`,
+  `vc`, `software`, `all`).
+- **Reasons translated at display level** — the French refusal
+  reasons from `radar/matching.py` are translated on the fly
+  (`translate_reason`), so the matching rules themselves are
+  untouched and all original tests still pass.
+- **Tracker stays French in the database** — SQLite statuses are
+  stored in French (`À postuler`, `Postulé`…) and displayed
+  translated; CSV export headers and statuses follow the selected
+  language. Switching language never loses or duplicates a tracked
+  application.
+
 ## What it does
 
 | Module | Question it answers |
@@ -61,6 +86,7 @@ The demo is now a full interactive app, not just filters:
 | `radar/data.py` | Load the programme dataset and the student profile from YAML |
 | `radar/scoring.py` | Why this score? KPI dashboard, blockers with actions |
 | `radar/onboarding.py` | 5-question chat that builds a visitor's profile |
+| `radar/i18n.py` | FR / EN strings, status translation, reason translation |
 | `radar/tracker.py` | Application tracking in SQLite + CSV export |
 | `demo.py` | CLI — the radar, the deadlines, the rejections with reasons |
 | `app.py` | Streamlit demo — the same radar as a small filterable site |
@@ -74,7 +100,7 @@ python demo.py                              # the radar for the example profile,
 python demo.py --date 2027-01-15           # the radar, on another date
 streamlit run app.py                        # the filterable site
 
-python -m pytest tests/ -q    # 28 tests (17 original + 11 for v2)
+python -m pytest tests/ -q    # 38 tests (17 original + 11 for v2 + 10 for v2.1)
 ```
 
 ## Example profile
