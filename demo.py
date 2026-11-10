@@ -1,7 +1,7 @@
-"""Demo: ton radar, pour ton profil.
+"""Demo: the radar, for the example profile.
 
 Usage:
-    python demo.py                        # profil my_profile.yaml, date du jour
+    python demo.py                        # profile my_profile.yaml, today's date
     python demo.py --profile my_profile.yaml --date 2027-01-15
 """
 
@@ -52,7 +52,7 @@ def main() -> None:
     print("=" * 72)
 
     ranked = rank_for_profile(programs, profile)
-    print(f"\n✅ Pour toi ({len(ranked)} programmes) — meilleurs scores d'abord :")
+    print(f"\n✅ Admissibles pour ce profil ({len(ranked)} programmes) — meilleurs scores d'abord :")
     for p, score in ranked[:12]:
         verified = "✓ vérifié" if p.verified else "⚠️ à vérifier"
         print(f"  [{score:>3}] {p.label} — {_badge(p, today)} — {verified}")
@@ -62,7 +62,7 @@ def main() -> None:
         elif p.search_hint:
             print(f"        Chercher sur le site officiel : {p.search_hint}")
 
-    print("\n❌ Pas pour toi maintenant — et pourquoi :")
+    print("\n❌ Pas admissibles pour ce profil — et pourquoi :")
     for p in programs:
         ok, reasons = eligibility(profile, p)
         if not ok:

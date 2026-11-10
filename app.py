@@ -35,7 +35,7 @@ today = date.today()
 st.set_page_config(page_title="ATS Quant Job Radar", layout="wide")
 st.title("🎯 ATS Quant Job Radar")
 st.caption(
-    f"{profile.name} — {profile.school}, {profile.current_year}re année, "
+    f"Profil d'exemple : {profile.name} — {profile.school}, {profile.current_year}re année, "
     f"diplomation {profile.graduation_ym}. Données vérifiées ou étiquetées à vérifier — "
     "aucun scraping, liens vers les pages officielles."
 )
@@ -54,7 +54,7 @@ with st.sidebar:
         ["Tous", "Montréal", "Toronto", "Vancouver", "New York", "Chicago", "Ottawa", "Canada"],
     )
     paid_only = st.checkbox("Rémunérés seulement")
-    eligible_only = st.checkbox("Admissible pour moi", value=True)
+    eligible_only = st.checkbox("Admissible pour ce profil", value=True)
     first_year_only = st.checkbox("Ouverts aux 1res années")
     query = st.text_input("Recherche (firme, programme, mot-clé)")
 
@@ -98,7 +98,7 @@ for p in shown:
         if p.deadline_note:
             st.write(f"**Calendrier :** {p.deadline_note}")
         if ok:
-            st.success("Admissible pour ton profil.")
+            st.success("Admissible pour ce profil.")
         else:
             st.warning("Pas admissible : " + "; ".join(reasons))
         if p.notes:

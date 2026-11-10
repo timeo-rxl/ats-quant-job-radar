@@ -17,25 +17,25 @@ def eligibility(profile: Profile, program: InternshipProgram) -> tuple[bool, lis
     if program.min_year is not None and profile.current_year < program.min_year:
         reasons.append(
             f"demande la {program.min_year}e année minimum "
-            f"(tu es en {profile.current_year}re année)"
+            f"(profil : {profile.current_year}re année)"
         )
     if program.max_year is not None and profile.current_year > program.max_year:
         reasons.append(
             f"réservé jusqu'à la {program.max_year}e année "
-            f"(tu es en {profile.current_year}re année)"
+            f"(profil : {profile.current_year}re année)"
         )
     grad = profile.graduation_ym
     if program.grad_not_before is not None and grad < program.grad_not_before:
         reasons.append(
             f"demande une diplomation à partir de {program.grad_not_before} "
-            f"(la tienne : {grad})"
+            f"(diplomation du profil : {grad})"
         )
     if program.grad_window is not None:
         start, end = program.grad_window
         if not (start <= grad <= end):
             reasons.append(
                 f"demande une diplomation entre {start} et {end} "
-                f"(la tienne : {grad})"
+                f"(diplomation du profil : {grad})"
             )
     if program.requires_us_auth and not profile.us_work_auth:
         reasons.append("exige une autorisation de travail aux États-Unis")
