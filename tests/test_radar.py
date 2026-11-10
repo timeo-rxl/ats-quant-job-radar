@@ -2,9 +2,9 @@
 
 The reference date is fixed (10 Nov 2026) so deadline statuses are
 deterministic. Expected eligibility comes from the Oct 2026 research
-report: big-bank markets/IB roles need graduation Dec 2027 / 2028,
-so a first-year graduating in 2029 is out; the realistic leads are
-startups, fintech, VC and a few explicitly open bank roles.
+report, updated by the full official-page verification audit of
+10 Nov 2026 (19/31 programmes verified, deadlines and eligibility
+corrected — see data/programs.yaml).
 """
 
 import sys
@@ -68,7 +68,7 @@ class TestEligibility(unittest.TestCase):
 
     def test_us_work_auth_blocks(self):
         profile, programs = load_all()
-        for pid in ["jpmorgan-emerging-talent", "janestreet-focus",
+        for pid in ["jpmorgan-emerging-talent", "citadel-discover",
                     "kleiner-perkins-fellows"]:
             ok, reasons = eligibility(profile, by_id(programs, pid))
             self.assertFalse(ok, f"{pid} needs US work auth")
@@ -83,7 +83,9 @@ class TestEligibility(unittest.TestCase):
     def test_eligible_count(self):
         profile, programs = load_all()
         eligible = [p for p in programs if eligibility(profile, p)[0]]
-        self.assertEqual(len(eligible), 16)
+        # 17 since the 10 Nov 2026 audit: Jane Street FOCUS no longer
+        # requires US work authorisation (verified on its official page).
+        self.assertEqual(len(eligible), 17)
 
 
 class TestScoring(unittest.TestCase):
@@ -102,7 +104,9 @@ class TestScoring(unittest.TestCase):
 class TestFilters(unittest.TestCase):
     def test_summer_2027_session(self):
         _, programs = load_all()
-        self.assertEqual(len(filter_programs(programs, session="summer_2027")), 24)
+        # 23 since the 10 Nov 2026 audit: BNC Corporate Finance is a
+        # winter 2027 internship, not summer 2027.
+        self.assertEqual(len(filter_programs(programs, session="summer_2027")), 23)
 
     def test_first_year_only(self):
         _, programs = load_all()
@@ -118,7 +122,7 @@ class TestFilters(unittest.TestCase):
     def test_eligible_only(self):
         profile, programs = load_all()
         out = filter_programs(programs, profile=profile, eligible_only=True)
-        self.assertEqual(len(out), 16)
+        self.assertEqual(len(out), 17)
         self.assertTrue(all(eligibility(profile, p)[0] for p in out))
 
 
@@ -144,7 +148,9 @@ class TestTimeline(unittest.TestCase):
         up = upcoming(programs, TODAY)
         dated = [p for p, _ in up if p.deadline]
         self.assertEqual(dated, sorted(dated, key=lambda p: p.deadline))
-        self.assertEqual(dated[0].id, "next36-2027")
+        # Earliest dated deadline since the 10 Nov 2026 audit: BNC
+        # Capital Markets closed registrations on 27 Feb 2026.
+        self.assertEqual(dated[0].id, "bnc-capital-markets")
 
 
 if __name__ == "__main__":

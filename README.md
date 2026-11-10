@@ -49,7 +49,8 @@ The demo is now a full interactive app, not just filters:
   SQLite database (`radar_tracker.db`, git-ignored, never the dataset),
   exportable to CSV.
 - **New design** — navy `#0B1B33` / orange `#FF5A1F` cards, hero,
-  status badges. Same honest data: 2 programmes verified, 29 to verify.
+  status badges. Same honest data, now verified: **19 programmes
+  verified on official pages (10 Nov 2026), 12 left to verify**.
 
 ## What it does
 
@@ -94,13 +95,14 @@ Analyst Summer 2027 (Montréal) and Banque Nationale — Corporate
 Finance Internships (Montréal). Both in Montréal, both open to
 first-years — verify they are still open on the official page.
 
-**16 programmes eligible, 15 not — and the rejections are the point :**
+**17 programmes eligible, 14 not — and the rejections are the point :**
 the big-bank markets/IB roles (RBC, TD, BMO, Goldman Summer Analyst)
 require graduation Dec 2027 / 2028, so they are sophomore-year
 targets, not first-year ones. The US programmes (JPMorgan Emerging
-Talent, Jane Street FOCUS, Citadel Discover) require US work
-authorisation. The radar tells you this instead of letting you apply
-into a wall.
+Talent, Citadel Discover) require US work authorisation. The radar
+tells you this instead of letting you apply into a wall. (17, not 16,
+since the 10 Nov 2026 audit: Jane Street FOCUS no longer requires US
+work authorisation — verified on its official page.)
 
 **Deadlines already gone for summer 2027 :** Next 36 (14 Oct 2026),
 BMO (30 Oct 2026). Still open : Kleiner Perkins Fellows (31 Jan 2027).
@@ -134,11 +136,13 @@ ats-quant-job-radar/
 - **Curated, not scraped.** Job boards change their pages and their
   rules; scraping them breaks and can violate their terms. This radar
   stores facts and links out — you apply on the official page.
-- **2 programmes verified, 29 to verify.** The verified ones were
-  checked against their source on 13 Oct 2026. The rest are known
-  programmes whose details must be confirmed on the official page
-  before applying — deadlines move every year, and an expired posting
-  is worse than no posting.
+- **19 programmes verified, 12 to verify.** The verified ones were
+  checked against their official page on 10 Nov 2026 (full audit of
+  all 29 unverified entries: deadlines, open/closed status, official
+  links, eligibility details). The rest are known programmes whose
+  details must be confirmed on the official page before applying —
+  deadlines move every year, and an expired posting is worse than
+  no posting.
 - **The dataset is a snapshot, not a live feed.** Add a programme by
   adding ~15 lines to `data/programs.yaml`; remove one by deleting
   them. If a deadline passes, the radar says "fermé" instead of
