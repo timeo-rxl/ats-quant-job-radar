@@ -27,6 +27,30 @@ Filtres disponibles : session (été 2027, hiver, été 2028…), catégorie
 mot-clé. Quand l'étudiant passe en 2e année, il change un chiffre dans
 son profil et tout le radar se recalcule.
 
+## v2.0 — what changed (10 Nov 2026)
+
+The demo is now a full interactive app, not just filters:
+
+- **🎯 Radar onboarding** — a rule-based chat assistant (no API key,
+  no LLM call) asks 5 questions (year, graduation, interests, city,
+  US work authorisation) and builds *the visitor's* profile, then
+  shows *their* matches. The example profile is still one click away.
+- **📊 KPI dashboard** — eligible / total, deadlines in the next
+  30 days, next-deadline countdown, Montréal count, charts by category
+  and deadline status.
+- **🔍 Score explained** — every score is broken down (50 eligibility
+  + up to 30 interests + 10 home city + 10 paid) so the visitor sees
+  *why* a programme ranks first.
+- **🚧 "Ce qui te bloque"** — every ineligible programme lists the
+  exact reason plus one concrete action ("Re-postule en 2e année",
+  "Il te faudra une autorisation US").
+- **📋 Application tracker** — mark each programme À postuler /
+  Postulé / Entretien / Offre / Refusé with a note, stored in a local
+  SQLite database (`radar_tracker.db`, git-ignored, never the dataset),
+  exportable to CSV.
+- **New design** — navy `#0B1B33` / orange `#FF5A1F` cards, hero,
+  status badges. Same honest data: 2 programmes verified, 29 to verify.
+
 ## What it does
 
 | Module | Question it answers |
@@ -34,6 +58,9 @@ son profil et tout le radar se recalcule.
 | `radar/matching.py` | Am I eligible? Why (not)? Score /100, explainable |
 | `radar/timeline.py` | Open, closing soon, closed, or watch? How many days left? |
 | `radar/data.py` | Load the programme dataset and the student profile from YAML |
+| `radar/scoring.py` | Why this score? KPI dashboard, blockers with actions |
+| `radar/onboarding.py` | 5-question chat that builds a visitor's profile |
+| `radar/tracker.py` | Application tracking in SQLite + CSV export |
 | `demo.py` | CLI — the radar, the deadlines, the rejections with reasons |
 | `app.py` | Streamlit demo — the same radar as a small filterable site |
 
@@ -46,7 +73,7 @@ python demo.py                              # the radar for the example profile,
 python demo.py --date 2027-01-15           # the radar, on another date
 streamlit run app.py                        # the filterable site
 
-python -m unittest discover -s tests -v    # 17 tests
+python -m pytest tests/ -q    # 28 tests (17 original + 11 for v2)
 ```
 
 ## Example profile
@@ -88,14 +115,18 @@ ats-quant-job-radar/
 │   ├── models.py       # Profile, InternshipProgram — plain dataclasses
 │   ├── matching.py     # eligibility + reasons, score, filters, ranking
 │   ├── timeline.py     # deadline statuses, days left, upcoming list
-│   └── data.py         # YAML loading
+│   ├── data.py         # YAML loading
+│   ├── scoring.py      # score breakdown, KPIs, blocker actions (v2)
+│   ├── onboarding.py   # 5-question chat, visitor profile (v2)
+│   └── tracker.py      # SQLite application tracking + CSV export (v2)
 ├── data/
 │   └── programs.yaml   # 31 programmes, sources + verification status
 ├── my_profile.yaml     # the student — edit this, the radar follows
 ├── demo.py             # CLI
 ├── app.py              # Streamlit demo
 └── tests/
-    └── test_radar.py   # 17 tests, fixed reference date
+    ├── test_radar.py        # 17 tests, fixed reference date
+    └── test_v2_features.py  # 11 tests for scoring, onboarding, tracker
 ```
 
 ## Honesty notes
