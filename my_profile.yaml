@@ -1,0 +1,17 @@
+# Mon profil — modifie ce fichier, le radar s'adapte.
+# current_year: 1 = 1re année, 2 = 2e année, etc.
+# graduation: date prévue de diplomation (AAAA-MM-JJ).
+# us_work_auth: true si tu peux travailler légalement aux États-Unis.
+# interests: quant, markets, investment_banking, asset_management,
+#   fintech, venture_capital, ai, startups, corporate_finance, tech.
+
+name: "Timéo Rouxel"
+school: "HEC Montréal"
+program: "B.A.A. — Finance de Marché & Stratégie d'Investissement"
+current_year: 1
+graduation: 2029-05-15
+us_work_auth: false
+languages: ["fr", "en"]
+home_base: "Montréal"
+open_to_remote: true
+interests: [quant, markets, investment_banking, asset_management, fintech, venture_capital, ai, startups, corporate_finance]
