@@ -8,6 +8,8 @@ No scraping. The dataset is curated from real research, every link
 points to the official application page, and anything unverified is
 labelled as such.
 
+**Live demo:** https://timeo-rxl-ats-quant-job-radar-app-q25tit.streamlit.app
+
 ## En français, en 30 secondes
 
 On décrit un profil une fois (`my_profile.yaml`) : année d'études, date
