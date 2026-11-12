@@ -1,177 +1,49 @@
-# ats-quant-job-radar
+# StageScope — Ton radar de stages. Zéro bruit. Un seul match.
 
-**Internship radar for a first-year student in finance, quant and tech.**
-31 programmes, one profile, one honest answer per programme: eligible,
-when it closes, and why not if not.
+**Live demo:** https://stagescope.lovable.app
 
-No scraping. The dataset is curated from real research, every link
-points to the official application page, and anything unverified is
-labelled as such.
+StageScope (formerly ATS Quant Job Radar) is an internship radar for 1st/2nd-year students in finance, quant and tech. It filters 31 real programmes (banks, quant, tech, VC, public sector) against your profile — study year, graduation date, city, US work authorization, interests — and scores each programme 0–100 with an explainable breakdown. No scraping: every programme links to its official application page, and a deadline is never guessed.
 
-**Live demo:** https://timeo-rxl-ats-quant-job-radar-app-q25tit.streamlit.app
+## The signature interaction
 
-## En français, en 30 secondes
+The home page has an interactive dotted band: move your mouse across it and employer logo cards appear at your cursor, fanned out like a hand of cards, then fade away. Click a card to open the Explorer filtered by that employer. On touch devices the band plays by itself.
 
-On décrit un profil une fois (`my_profile.yaml`) : année d'études, date
-de diplomation, autorisation de travail aux États-Unis, centres d'intérêt.
-Le radar indique, pour chaque programme :
+## How the matching works
 
-- **✅ Admissible** — avec un score /100 et la date limite.
-- **❌ Pas admissible (encore)** — avec la raison exacte : « demande une
-  diplomation entre déc. 2027 et juin 2028 », « exige une autorisation
-  de travail aux États-Unis », « demande la 2e année minimum ».
-- **⏰ Échéances** — ouvert, ferme bientôt (≤ 14 jours), fermé, à surveiller.
+The engine lives in `src/lib/matching.ts` (tests in `src/lib/matching.test.ts`):
 
-Filtres disponibles : session (été 2027, hiver, été 2028…), catégorie
-(banque, quant, tech, VC/startup, public), lieu, et recherche par
-mot-clé. Quand l'étudiant passe en 2e année, il change un chiffre dans
-son profil et tout le radar se recalcule.
-
-## v2.0 — what changed (10 Nov 2026)
-
-The demo is now a full interactive app, not just filters:
-
-- **🎯 Radar onboarding** — a rule-based chat assistant (no API key,
-  no LLM call) asks 5 questions (year, graduation, interests, city,
-  US work authorisation) and builds *the visitor's* profile, then
-  shows *their* matches. The example profile is still one click away.
-- **📊 KPI dashboard** — eligible / total, deadlines in the next
-  30 days, next-deadline countdown, Montréal count, charts by category
-  and deadline status.
-- **🔍 Score explained** — every score is broken down (50 eligibility
-  + up to 30 interests + 10 home city + 10 paid) so the visitor sees
-  *why* a programme ranks first.
-- **🚧 "Ce qui te bloque"** — every ineligible programme lists the
-  exact reason plus one concrete action ("Re-postule en 2e année",
-  "Il te faudra une autorisation US").
-- **📋 Application tracker** — mark each programme À postuler /
-  Postulé / Entretien / Offre / Refusé with a note, stored in a local
-  SQLite database (`radar_tracker.db`, git-ignored, never the dataset),
-  exportable to CSV.
-- **New design** — navy `#0B1B33` / orange `#FF5A1F` cards, hero,
-  status badges. Same honest data, now verified: **19 programmes
-  verified on official pages (10 Nov 2026), 12 left to verify**.
-
-## v2.1 — bilingual FR / EN (10 Nov 2026)
-
-The whole app now speaks French and English, with a visible toggle
-(🌐 Français / English) at the top of the sidebar. The language
-switches instantly and never resets the visitor's profile or their
-tracked applications:
-
-- **Full UI translation** — hero, KPI dashboard, tabs, filters,
-  badges, score breakdown, blockers view, tracker — via
-  `radar/i18n.py` (one `STRINGS` dictionary, French fallback).
-- **Onboarding in English too** — the 5 questions, and the parsers
-  accept English answers: `freshman` / `sophomore` / `junior` /
-  `senior`, `1st year` … `4th year`, English months (`May 2029`),
-  `yes` / `no`, English interest aliases (`banking`, `trading`,
-  `vc`, `software`, `all`).
-- **Reasons translated at display level** — the French refusal
-  reasons from `radar/matching.py` are translated on the fly
-  (`translate_reason`), so the matching rules themselves are
-  untouched and all original tests still pass.
-- **Tracker stays French in the database** — SQLite statuses are
-  stored in French (`À postuler`, `Postulé`…) and displayed
-  translated; CSV export headers and statuses follow the selected
-  language. Switching language never loses or duplicates a tracked
-  application.
-
-## What it does
-
-| Module | Question it answers |
+| Rule | How it works |
 | --- | --- |
-| `radar/matching.py` | Am I eligible? Why (not)? Score /100, explainable |
-| `radar/timeline.py` | Open, closing soon, closed, or watch? How many days left? |
-| `radar/data.py` | Load the programme dataset and the student profile from YAML |
-| `radar/scoring.py` | Why this score? KPI dashboard, blockers with actions |
-| `radar/onboarding.py` | 5-question chat that builds a visitor's profile |
-| `radar/i18n.py` | FR / EN strings, status translation, reason translation |
-| `radar/tracker.py` | Application tracking in SQLite + CSV export |
-| `demo.py` | CLI — the radar, the deadlines, the rejections with reasons |
-| `app.py` | Streamlit demo — the same radar as a small filterable site |
+| **Eligibility checklist** | min/max study year, graduation not before / graduation window, US work authorization — every refusal carries its reason in plain language (FR + EN) |
+| **Score 0–100** | 0 if ineligible. Otherwise 50 for being eligible + up to 30 for shared interests + 10 for home city + 10 if paid, capped at 100 |
+| **Ranking** | Eligible first, best score first, then alphabetical by firm |
+| **Closed deadlines** | A programme whose deadline has passed shows as closed and moves to the bottom of lists — never deleted |
+
+With the default profile (1st year, HEC Montréal, graduation 2029-05, Montréal, no US authorization, interests quant / markets / investment banking / corporate finance): BNP Paribas Corporate Credit Analyst 100, Banque Nationale Corporate Finance 100, Desjardins 85, Banque du Canada 80, Capital One Strategy Analyst 70.
+
+## Pages
+
+**Accueil** (hero, logo band, live KPIs, top matches), **Trouve ton stage** (5-step onboarding → personalized ranking + "Ce qui te bloque"), **Explorer** (filters: category, session, city, paid only, eligible only, text search), **programme detail** (eligibility, deadline with [VÉRIFIÉ] / [À VÉRIFIER] badge, official link), **Suivi** (application tracker in localStorage + CSV export).
+
+French by default, with a FR/EN toggle. No backend, no account: profile, language and tracker live in localStorage.
 
 ## Try it
 
 ```bash
-pip install -r requirements.txt
-
-python demo.py                              # the radar for the example profile, today
-python demo.py --date 2027-01-15           # the radar, on another date
-streamlit run app.py                        # the filterable site
-
-python -m pytest tests/ -q    # 38 tests (17 original + 11 for v2 + 10 for v2.1)
+npm install
+npm run dev     # local dev server
+npm test        # vitest — matching engine + routing
+npm run build   # production build
 ```
 
-## Example profile
+## Data — read this
 
-`my_profile.yaml` — a first-year B.A.A. student at HEC Montréal,
-graduating 2029-05, no US work authorisation, Montréal-based, open
-to remote. Interests: quant, markets, investment banking, asset
-management, fintech, venture capital, AI, startups, corporate finance.
+The dataset (`src/data/programs.json`, 31 programmes) is curated from official pages only. `verified: true` means checked against the source on the shown date; `verified: false` means known programme, details to verify on the official page before applying. Only deadlines published on an official page are listed — the rest show their note or "no published deadline". Deadlines move every year: the official page decides, never this repo.
 
-Change `current_year` to 2 next year and re-run: the sophomore
-programmes (Morgan Stanley Early Insights, CPP Discover…) flip to
-eligible automatically.
+## Tech
 
-## Worked example — first-year profile (10 Nov 2026)
+React + Vite + Tailwind CSS + shadcn/ui + TanStack Router. Built on Lovable (November 2026).
 
-**Top matches (score 100/100) :** BNP Paribas — Corporate Credit
-Analyst Summer 2027 (Montréal) and Banque Nationale — Corporate
-Finance Internships (Montréal). Both in Montréal, both open to
-first-years — verify they are still open on the official page.
+## History
 
-**17 programmes eligible, 14 not — and the rejections are the point :**
-the big-bank markets/IB roles (RBC, TD, BMO, Goldman Summer Analyst)
-require graduation Dec 2027 / 2028, so they are sophomore-year
-targets, not first-year ones. The US programmes (JPMorgan Emerging
-Talent, Citadel Discover) require US work authorisation. The radar
-tells you this instead of letting you apply into a wall. (17, not 16,
-since the 10 Nov 2026 audit: Jane Street FOCUS no longer requires US
-work authorisation — verified on its official page.)
-
-**Deadlines already gone for summer 2027 :** Next 36 (14 Oct 2026),
-BMO (30 Oct 2026). Still open : Kleiner Perkins Fellows (31 Jan 2027).
-To watch : Bank of Canada (applications in January 2027), Front Row
-Ventures (January cycles), Wealthsimple summer postings (Jan–Apr 2027).
-
-## Project structure
-
-```
-ats-quant-job-radar/
-├── radar/
-│   ├── models.py       # Profile, InternshipProgram — plain dataclasses
-│   ├── matching.py     # eligibility + reasons, score, filters, ranking
-│   ├── timeline.py     # deadline statuses, days left, upcoming list
-│   ├── data.py         # YAML loading
-│   ├── scoring.py      # score breakdown, KPIs, blocker actions (v2)
-│   ├── onboarding.py   # 5-question chat, visitor profile (v2)
-│   └── tracker.py      # SQLite application tracking + CSV export (v2)
-├── data/
-│   └── programs.yaml   # 31 programmes, sources + verification status
-├── my_profile.yaml     # the student — edit this, the radar follows
-├── demo.py             # CLI
-├── app.py              # Streamlit demo
-└── tests/
-    ├── test_radar.py        # 17 tests, fixed reference date
-    └── test_v2_features.py  # 11 tests for scoring, onboarding, tracker
-```
-
-## Honesty notes
-
-- **Curated, not scraped.** Job boards change their pages and their
-  rules; scraping them breaks and can violate their terms. This radar
-  stores facts and links out — you apply on the official page.
-- **19 programmes verified, 12 to verify.** The verified ones were
-  checked against their official page on 10 Nov 2026 (full audit of
-  all 29 unverified entries: deadlines, open/closed status, official
-  links, eligibility details). The rest are known programmes whose
-  details must be confirmed on the official page before applying —
-  deadlines move every year, and an expired posting is worse than
-  no posting.
-- **The dataset is a snapshot, not a live feed.** Add a programme by
-  adding ~15 lines to `data/programs.yaml`; remove one by deleting
-  them. If a deadline passes, the radar says "fermé" instead of
-  pretending the opportunity is still there.
-- **Not a guarantee.** A score of 100 means "eligible on paper and
-  matching your interests", not "you will get the offer".
+The matching engine was first built and tested in Python (38 tests) with a Streamlit demo; the full history is in the git log. The current app is a complete rebuild (Lovable, November 2026) that ports the engine to TypeScript and ships it as a real product interface, under the new name StageScope.
